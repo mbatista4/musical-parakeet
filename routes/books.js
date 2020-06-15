@@ -50,15 +50,102 @@ router.post('/', async (req, res) => {
 
     try {
         const newBook = await book.save();
-        //res.redirect(`books/${newBook.id}`);
-        res.redirect('books');
+        res.redirect(`books/${newBook.id}`);
+
     } catch (err) {
         renderNewPage(res, book, err);
     }
 
 });
 
+// Show Single Book Route
+router.get('/:id', async (req, res) => {
+    try {
+        const book = await Book.findById(req.params.id).populate('author').exec();
+        res.render('books/show', {
+            book: book
+        });
+
+    } catch {
+
+    }
+})
+
+//Edit Book Route
+router.get('/:id/edit', async (req, res) => {
+    try {
+        const book = await Book.findById(req.params.id);
+
+        renderEditPage(res, book);
+    } catch {
+        res.redirect('/');
+    }
+});
+
+//Update Book route
+router.put('/:id', async (req, res) => {
+    let book;
+
+    try {
+        book = await Book.findById(req.params.id);
+
+        book.title = req.body.title
+        book.author = req.body.author
+        book.publishDate = new Date(req.body.publishDate)
+        book.pageCount = req.body.pageCount
+        book.description = req.body.description
+
+        if (req.body.cover != null && req.body.cover !== '')
+            saveCover(book, req.body.cover);
+
+
+        await book.save();
+        res.redirect(`/books/${book.id}`);
+
+    } catch (err) {
+        if (book != null) {
+            renderEditPage(res, book, err);
+        } else {
+            res.redirect('/');
+        }
+    }
+
+});
+
+router.delete('/:id', async (req, res) => {
+    let book;
+
+    try {
+        book = await Book.findById(req.params.id);
+        await book.remove();
+        res.redirect('/books');
+    } catch {
+        if (book != null) {
+            res.render('books/show', {
+                book: book,
+                errorMessage: 'Could not remove Book'
+            });
+        } else {
+            res.redirect('/');
+        }
+    }
+});
+
+
+// used as middleWare to render new Page
 async function renderNewPage(res, book, err = null) {
+    renderFormPage(res, book, 'new', err)
+}
+
+
+// used as middleWare to render new Page
+async function renderEditPage(res, book, err = null) {
+    renderFormPage(res, book, 'edit', err);
+}
+
+
+// used as middleWare to render Pages
+async function renderFormPage(res, book, form, err = null) {
     try {
         const authors = await Author.find({});
         let locals = {
@@ -67,12 +154,14 @@ async function renderNewPage(res, book, err = null) {
         };
         if (err != null) locals.errorMessage = err;
 
-        res.render('books/new', locals);
+        res.render(`books/${form}`, locals);
     } catch {
         res.redirect('books');
     }
 }
 
+
+// Save Cover Image To DB
 function saveCover(book, coverEncoded) {
 
     if (coverEncoded == null)
